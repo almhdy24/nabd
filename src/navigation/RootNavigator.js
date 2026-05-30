@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { onAuthChange, getUserData } from "../services/authService";
+import { registerForPushNotificationsAsync } from "../services/notificationService";
 import AuthNavigator from "./AuthNavigator";
 import AppNavigator from "./AppNavigator";
 import SplashScreen from "../screens/SplashScreen";
@@ -13,20 +14,28 @@ export default function RootNavigator() {
   useEffect(() => {
     const unsubscribeAuth = onAuthChange(async (curr) => {
       if (curr) {
+        // First get user data from Firestore
         const data = await getUserData(curr.uid);
-        setUser({ ...curr, ...data });
+        let fullUser = { ...curr, ...data };
+
+        // Register push notification and save token
+        const token = await registerForPushNotificationsAsync(fullUser.uid);
+        if (token) {
+          // Re-fetch user data to get updated pushTokens array
+          const updatedData = await getUserData(curr.uid);
+          fullUser = { ...fullUser, ...updatedData };
+        }
+        setUser(fullUser);
       } else {
         setUser(null);
       }
       setLoading(false);
     });
 
-    // Hide splash after 2.5 seconds
-    const timer = setTimeout(() => setSplashVisible(false), 2500);
-
+    const splashTimer = setTimeout(() => setSplashVisible(false), 2500);
     return () => {
       unsubscribeAuth();
-      clearTimeout(timer);
+      clearTimeout(splashTimer);
     };
   }, []);
 

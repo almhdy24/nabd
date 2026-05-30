@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import AppText from '../components/AppText';
@@ -33,6 +33,7 @@ export default function NotificationHistoryScreen({ user }) {
     switch (type) {
       case 'new_request': return 'bell-ring';
       case 'request_accepted': return 'hand-heart';
+      case 'system': return 'information';
       default: return 'bell-outline';
     }
   };

@@ -1,10 +1,9 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
-import { doc, setDoc, updateDoc, arrayUnion, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { Platform, Alert } from 'react-native';
+import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
-// Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -13,11 +12,10 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Register device token and save to Firestore
 export async function registerForPushNotificationsAsync(userId) {
   if (!Device.isDevice) {
-    console.log('Must use physical device for Push Notifications');
-    return;
+    console.log('Must use physical device for push notifications');
+    return null;
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -28,35 +26,43 @@ export async function registerForPushNotificationsAsync(userId) {
   }
   if (finalStatus !== 'granted') {
     console.log('Failed to get push token permission');
-    return;
+    Alert.alert('تنبيه', 'يجب منح صلاحية الإشعارات لتلقي تنبيهات التبرع');
+    return null;
   }
 
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
-  console.log('Expo push token:', token);
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const token = tokenData.data;
+    console.log('Expo push token:', token);
 
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
-
-  // Save token to Firestore
-  if (token && userId) {
-    const userRef = doc(db, 'users', userId);
-    const userSnap = await getDoc(userRef);
-    let tokens = userSnap.data()?.pushTokens || [];
-    if (!tokens.includes(token)) {
-      tokens.push(token);
-      await updateDoc(userRef, { pushTokens: tokens });
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
     }
+
+    if (token && userId) {
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+      let tokens = userSnap.data()?.pushTokens || [];
+      if (!tokens.includes(token)) {
+        tokens.push(token);
+        await updateDoc(userRef, { pushTokens: tokens });
+        console.log('Push token saved to Firestore');
+      } else {
+        console.log('Push token already exists');
+      }
+    }
+    return token;
+  } catch (error) {
+    console.error('Error getting push token:', error);
+    return null;
   }
-  return token;
 }
 
-// Send push notification via Expo
 export async function sendPushNotification(expoPushToken, title, body, data = {}) {
   const message = {
     to: expoPushToken,
@@ -65,7 +71,7 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
     body,
     data,
   };
-  await fetch('https://exp.host/--/api/v2/push/send', {
+  const response = await fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -73,15 +79,19 @@ export async function sendPushNotification(expoPushToken, title, body, data = {}
     },
     body: JSON.stringify(message),
   });
+  const result = await response.json();
+  if (result.data?.status === 'error') {
+    throw new Error(result.data.message || 'فشل الإرسال');
+  }
+  return result;
 }
 
-// Save notification to user's history in Firestore
 export async function saveNotificationToHistory(userId, title, body, type, requestId = null) {
   const notification = {
     id: Date.now().toString(),
     title,
     body,
-    type, // 'request_accepted', 'new_request', 'system'
+    type, // 'new_request', 'request_accepted', 'system'
     requestId,
     createdAt: new Date().toISOString(),
     read: false,
@@ -90,56 +100,16 @@ export async function saveNotificationToHistory(userId, title, body, type, reque
   await updateDoc(userRef, {
     notifications: arrayUnion(notification),
   });
+  console.log('Notification saved to history:', notification);
 }
 
-// Notify all donors about a new blood request
-export async function notifyDonorsNewRequest(requestData) {
-  const { bloodType, location, hospital, id } = requestData;
-  const q = query(
-    collection(db, 'users'),
-    where('role', '==', 'donor'),
-    where('bloodType', '==', bloodType),
-    where('available', '==', true)
-  );
-  const snapshot = await getDocs(q);
-  for (const docSnap of snapshot.docs) {
-    const donor = docSnap.data();
-    const tokens = donor.pushTokens || [];
-    for (const token of tokens) {
-      await sendPushNotification(
-        token,
-        'نداء تبرع جديد',
-        `مطلوب فصيلة ${bloodType} في ${location}${hospital ? ` - ${hospital}` : ''}`,
-        { requestId: id }
-      );
-      await saveNotificationToHistory(
-        docSnap.id,
-        'نداء تبرع جديد',
-        `مطلوب فصيلة ${bloodType} في ${location}`,
-        'new_request',
-        id
-      );
-    }
+export async function refreshPushToken(userId, setUser) {
+  const token = await registerForPushNotificationsAsync(userId);
+  if (token && setUser) {
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    const freshUser = userSnap.data();
+    setUser((prev) => ({ ...prev, pushTokens: freshUser?.pushTokens || [], notifications: freshUser?.notifications || [] }));
   }
-}
-
-// Notify requestor when a donor accepts
-export async function notifyRequestorOnAccept(requestorId, donorInfo, requestId) {
-  const userSnap = await getDoc(doc(db, 'users', requestorId));
-  const tokens = userSnap.data()?.pushTokens || [];
-  for (const token of tokens) {
-    await sendPushNotification(
-      token,
-      'تم استلام استجابة',
-      `تطوع ${donorInfo.bloodType} للتبرع لك. اتصل به الآن: ${donorInfo.phone}`,
-      { requestId }
-    );
-    await saveNotificationToHistory(
-      requestorId,
-      'تم استلام استجابة',
-      `تطوع متبرع لفصيلة ${donorInfo.bloodType}. يمكنك الاتصال به.`,
-      'request_accepted',
-      requestId
-    );
-  }
+  return token;
 }

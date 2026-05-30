@@ -1,0 +1,26 @@
+<svg width="512" height="512" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  
+  <!-- Heart Shape -->
+  <path d="M100 170
+           C 40 120, 20 80, 50 50
+           C 70 30, 90 40, 100 60
+           C 110 40, 130 30, 150 50
+           C 180 80, 160 120, 100 170Z"
+        fill="#E63946"/>
+
+  <!-- Pulse Line -->
+  <path d="M40 100 L70 100 L85 70 L100 130 L115 90 L130 100 L160 100"
+        stroke="white"
+        stroke-width="4"
+        fill="none"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Drop -->
+  <path d="M100 85
+           C 92 95, 85 110, 100 120
+           C 115 110, 108 95, 100 85Z"
+        fill="#ffffff"
+        opacity="0.9"/>
+
+</svg>
