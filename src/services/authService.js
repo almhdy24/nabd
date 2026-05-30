@@ -5,32 +5,36 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, db } from "./firebase"; 
+import { auth, db } from "./firebase";
 
-// تسجيل الدخول
 export const loginWithEmail = async (email, password) => {
-  const userCredential = await signInWithEmailAndPassword(auth, email, password);
-  return userCredential.user;
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (error) {
+    throw error; // preserve Firebase error code
+  }
 };
 
-// التسجيل مع حفظ الدور في Firestore
 export const registerWithEmail = async (email, password, role) => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-  const user = userCredential.user;
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-  // حفظ بيانات المستخدم الإضافية
-  await setDoc(doc(db, "users", user.uid), {
-    uid: user.uid,
-    email: email,
-    role: role, // 'donor' أو 'requestor'
-    available: role === "donor", 
-    createdAt: new Date().toISOString(),
-  });
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      email: email,
+      role: role,
+      available: role === "donor",
+      createdAt: new Date().toISOString(),
+    });
 
-  return user;
+    return user;
+  } catch (error) {
+    throw error;
+  }
 };
 
-// جلب بيانات المستخدم من Firestore
 export const getUserData = async (uid) => {
   try {
     const docRef = doc(db, "users", uid);

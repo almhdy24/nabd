@@ -12,15 +12,39 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AppText from "../components/AppText";
-import { Colors } from "../theme/colors";
+import { useTheme } from "../context/ThemeContext";
 import { loginWithEmail, registerWithEmail } from "../services/authService";
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("donor");
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  const getFirebaseErrorMessage = (errorCode) => {
+    switch (errorCode) {
+      case 'auth/invalid-email':
+        return 'البريد الإلكتروني غير صالح';
+      case 'auth/user-disabled':
+        return 'تم تعطيل هذا الحساب';
+      case 'auth/user-not-found':
+        return 'لا يوجد حساب مرتبط بهذا البريد';
+      case 'auth/wrong-password':
+        return 'كلمة المرور غير صحيحة';
+      case 'auth/email-already-in-use':
+        return 'هذا البريد مسجل بالفعل';
+      case 'auth/weak-password':
+        return 'كلمة المرور ضعيفة (يجب أن تكون 6 أحرف على الأقل)';
+      case 'auth/network-request-failed':
+        return 'فشل الاتصال بالإنترنت، تأكد من اتصالك';
+      case 'auth/too-many-requests':
+        return 'تم تعطيل الحساب مؤقتاً بسبب محاولات كثيرة. حاول لاحقاً';
+      default:
+        return 'حدث خطأ غير متوقع، حاول مرة أخرى';
+    }
+  };
 
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
@@ -36,7 +60,8 @@ export default function LoginScreen() {
         await registerWithEmail(email, password, role);
       }
     } catch (error) {
-      Alert.alert("خطأ", "تأكد من البيانات أو الاتصال بالشبكة");
+      const errorMessage = getFirebaseErrorMessage(error.code);
+      Alert.alert("خطأ", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -47,159 +72,116 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
     >
-      <ScrollView contentContainerStyle={styles.container}>
-
-        <View style={styles.card}>
-
-          {/* Brand Header */}
-          <MaterialCommunityIcons
-            name="heart-pulse"
-            size={70}
-            color={Colors.primary}
-          />
-
-          <AppText bold style={styles.brand}>
-            نبض
-          </AppText>
-
-          <AppText style={styles.subtitle}>
-            Nabd – Blood Donation Sudan
-          </AppText>
-
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <MaterialCommunityIcons name="heart-pulse" size={70} color={colors.primary} />
+          <AppText bold style={[styles.brand, { color: colors.primary }]}>نبض</AppText>
+          <AppText style={[styles.subtitle, { color: colors.textLight }]}>Nabd – Blood Donation Sudan</AppText>
           <View style={styles.taglineRow}>
-            <MaterialCommunityIcons
-              name="pulse"
-              size={18}
-              color={Colors.primary}
-            />
-            <AppText style={styles.tagline}>
-              نبض الحياة يبدأ منك
-            </AppText>
+            <MaterialCommunityIcons name="pulse" size={18} color={colors.primary} />
+            <AppText style={[styles.tagline, { color: colors.textLight }]}>نبض الحياة يبدأ منك</AppText>
           </View>
 
-          {/* Form Card */}
           <View style={styles.form}>
-
-            <View style={styles.inputWrapper}>
-              <MaterialCommunityIcons
-                name="email-outline"
-                size={18}
-                color={Colors.mediumGray}
-              />
+            <View style={[styles.inputWrapper, { backgroundColor: colors.input }]}>
+              <MaterialCommunityIcons name="email-outline" size={18} color={colors.textLight} />
               <TextInput
                 placeholder="البريد الإلكتروني"
                 value={email}
                 onChangeText={setEmail}
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                placeholderTextColor={colors.textLight}
               />
             </View>
 
-            <View style={styles.inputWrapper}>
-              <MaterialCommunityIcons
-                name="lock-outline"
-                size={18}
-                color={Colors.mediumGray}
-              />
+            <View style={[styles.inputWrapper, { backgroundColor: colors.input }]}>
+              <MaterialCommunityIcons name="lock-outline" size={18} color={colors.textLight} />
               <TextInput
                 placeholder="كلمة المرور"
                 value={password}
                 onChangeText={setPassword}
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 secureTextEntry
+                placeholderTextColor={colors.textLight}
               />
             </View>
 
-            {/* Role Selection */}
             {!isLoginMode && (
               <View style={styles.roleContainer}>
-
-                <AppText style={styles.roleLabel}>
-                  اختر نوع الحساب
-                </AppText>
-
+                <AppText style={[styles.roleLabel, { color: colors.textLight }]}>اختر نوع الحساب</AppText>
                 <View style={styles.roleButtons}>
-
                   <TouchableOpacity
                     style={[
                       styles.roleBtn,
-                      role === "donor" && styles.roleActive,
+                      { borderColor: colors.mediumGray },
+                      role === "donor" && { backgroundColor: colors.primary, borderColor: colors.primary }
                     ]}
                     onPress={() => setRole("donor")}
                   >
                     <MaterialCommunityIcons
                       name="hand-heart"
                       size={18}
-                      color={role === "donor" ? "#fff" : Colors.primary}
+                      color={role === "donor" ? colors.white : colors.primary}
                     />
                     <AppText
-                      style={
-                        role === "donor"
-                          ? styles.roleTextActive
-                          : styles.roleText
-                      }
+                      style={[
+                        styles.roleText,
+                        { color: role === "donor" ? colors.white : colors.primary },
+                        role === "donor" && { fontWeight: "bold" }
+                      ]}
                     >
                       متبرع
                     </AppText>
                   </TouchableOpacity>
-
                   <TouchableOpacity
                     style={[
                       styles.roleBtn,
-                      role === "requestor" && styles.roleActive,
+                      { borderColor: colors.mediumGray },
+                      role === "requestor" && { backgroundColor: colors.primary, borderColor: colors.primary }
                     ]}
                     onPress={() => setRole("requestor")}
                   >
                     <MaterialCommunityIcons
                       name="hospital-box"
                       size={18}
-                      color={role === "requestor" ? "#fff" : Colors.primary}
+                      color={role === "requestor" ? colors.white : colors.primary}
                     />
                     <AppText
-                      style={
-                        role === "requestor"
-                          ? styles.roleTextActive
-                          : styles.roleText
-                      }
+                      style={[
+                        styles.roleText,
+                        { color: role === "requestor" ? colors.white : colors.primary },
+                        role === "requestor" && { fontWeight: "bold" }
+                      ]}
                     >
                       طلب دم
                     </AppText>
                   </TouchableOpacity>
-
                 </View>
               </View>
             )}
 
-            {/* Button */}
             <TouchableOpacity
-              style={styles.mainBtn}
+              style={[styles.mainBtn, { backgroundColor: colors.primary }]}
               onPress={handleAuth}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.white} />
               ) : (
-                <AppText bold style={{ color: "#fff" }}>
+                <AppText bold style={{ color: colors.white }}>
                   {isLoginMode ? "دخول" : "إنشاء حساب"}
                 </AppText>
               )}
             </TouchableOpacity>
 
-            {/* Switch Mode */}
-            <TouchableOpacity
-              onPress={() => setIsLoginMode(!isLoginMode)}
-              style={{ marginTop: 18 }}
-            >
-              <AppText style={styles.switchText}>
-                {isLoginMode
-                  ? "ليس لديك حساب؟ إنشاء حساب جديد"
-                  : "لديك حساب؟ تسجيل الدخول"}
+            <TouchableOpacity onPress={() => setIsLoginMode(!isLoginMode)} style={{ marginTop: 18 }}>
+              <AppText style={[styles.switchText, { color: colors.primary }]}>
+                {isLoginMode ? "ليس لديك حساب؟ إنشاء حساب جديد" : "لديك حساب؟ تسجيل الدخول"}
               </AppText>
             </TouchableOpacity>
-
           </View>
-
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -211,80 +193,61 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     padding: 20,
-    backgroundColor: Colors.lightGray,
   },
-
   card: {
-    backgroundColor: "#fff",
     padding: 26,
     borderRadius: 28,
     alignItems: "center",
   },
-
   brand: {
     fontSize: 36,
     marginTop: 10,
-    color: Colors.primary,
   },
-
   subtitle: {
     fontSize: 13,
-    color: Colors.textLight,
     marginBottom: 6,
   },
-
   taglineRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginBottom: 18,
   },
-
   tagline: {
     fontSize: 14,
     fontStyle: "italic",
-    color: Colors.textLight,
   },
-
   form: {
     width: "100%",
     marginTop: 10,
   },
-
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.lightGray,
     borderRadius: 14,
     paddingHorizontal: 12,
     marginBottom: 12,
     height: 52,
     gap: 8,
   },
-
   input: {
     flex: 1,
     textAlign: "right",
     fontFamily: "Cairo",
   },
-
   roleContainer: {
     marginTop: 10,
     marginBottom: 14,
   },
-
   roleLabel: {
     textAlign: "right",
     marginBottom: 10,
-    color: Colors.textLight,
     fontSize: 13,
   },
-
   roleButtons: {
     flexDirection: "row",
     gap: 10,
   },
-
   roleBtn: {
     flex: 1,
     flexDirection: "row",
@@ -292,35 +255,19 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.mediumGray,
     justifyContent: "center",
     alignItems: "center",
   },
-
-  roleActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-
   roleText: {
-    color: Colors.primary,
+    fontSize: 14,
   },
-
-  roleTextActive: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-
   mainBtn: {
-    backgroundColor: Colors.primary,
     padding: 15,
     borderRadius: 14,
     alignItems: "center",
     marginTop: 8,
   },
-
   switchText: {
-    color: Colors.primary,
     textAlign: "center",
     fontSize: 13,
   },

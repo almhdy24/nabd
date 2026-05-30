@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, Alert } from 'react-native';
-import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 Notifications.setNotificationHandler({
@@ -47,13 +47,25 @@ export async function registerForPushNotificationsAsync(userId) {
     if (token && userId) {
       const userRef = doc(db, 'users', userId);
       const userSnap = await getDoc(userRef);
-      let tokens = userSnap.data()?.pushTokens || [];
-      if (!tokens.includes(token)) {
-        tokens.push(token);
-        await updateDoc(userRef, { pushTokens: tokens });
-        console.log('Push token saved to Firestore');
+      
+      // If user document does not exist, create it with minimal data
+      if (!userSnap.exists()) {
+        console.log('User document missing, creating it...');
+        await setDoc(userRef, {
+          uid: userId,
+          pushTokens: [token],
+          createdAt: new Date().toISOString(),
+        });
+        console.log('User document created with push token');
       } else {
-        console.log('Push token already exists');
+        let tokens = userSnap.data()?.pushTokens || [];
+        if (!tokens.includes(token)) {
+          tokens.push(token);
+          await updateDoc(userRef, { pushTokens: tokens });
+          console.log('Push token saved to Firestore');
+        } else {
+          console.log('Push token already exists');
+        }
       }
     }
     return token;
